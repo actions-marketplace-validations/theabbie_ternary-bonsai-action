@@ -1,0 +1,38 @@
+name: Local inference
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Run Ternary Bonsai 27B locally
+        id: bonsai
+        uses: theabbie/ternary-bonsai-action@v1
+        with:
+          hf-token: ${{ secrets.HF_TOKEN }}
+          prompt: What is 17 plus 25? Answer with only the number.
+          max-tokens: "512"
+          context-size: "4096"
+          temperature: "0"
+
+      - name: Verify answer
+        env:
+          ANSWER: ${{ steps.bonsai.outputs.response }}
+          CACHE_HIT: ${{ steps.bonsai.outputs.cache-hit }}
+          MODEL_PATH: ${{ steps.bonsai.outputs.model-path }}
+          TIMINGS: ${{ steps.bonsai.outputs.timings }}
+        run: |
+          grep -q '42' <<<"$ANSWER"
+          {
+            printf '## Local inference result\n\n'
+            printf '**Answer:** `%s`\n\n' "$ANSWER"
+            printf '**Model path:** `%s`\n\n' "$MODEL_PATH"
+            printf '**Cache hit:** `%s`\n\n' "$CACHE_HIT"
+            printf '**Timings:** `%s`\n' "$TIMINGS"
+          } >> "$GITHUB_STEP_SUMMARY"

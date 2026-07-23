@@ -1,0 +1,98 @@
+name: Run Ternary Bonsai 27B Locally
+description: Download and run Ternary Bonsai 27B locally on a GitHub Actions runner.
+author: Abhishek Choudhary
+branding:
+  icon: cpu
+  color: green
+inputs:
+  prompt:
+    description: User prompt. Use either prompt or prompt-file.
+    required: false
+  prompt-file:
+    description: Path to a UTF-8 text file containing the user prompt.
+    required: false
+  system-prompt:
+    description: System prompt sent before the user prompt.
+    required: false
+    default: You are a helpful assistant.
+  hf-token:
+    description: Optional Hugging Face token used only to download the public model.
+    required: false
+  cache:
+    description: Cache the model and llama.cpp runtime between workflow runs.
+    required: false
+    default: "true"
+  context-size:
+    description: Local llama.cpp context size.
+    required: false
+    default: "4096"
+  max-tokens:
+    description: Optional completion token ceiling. Leave empty to let the model stop naturally.
+    required: false
+  temperature:
+    description: Sampling temperature from 0 to 2.
+    required: false
+    default: "0.7"
+  top-p:
+    description: Nucleus sampling value greater than 0 and at most 1.
+    required: false
+    default: "0.95"
+  response-file:
+    description: Path for the generated response.
+    required: false
+    default: bonsai-response.txt
+outputs:
+  response:
+    description: Generated final answer.
+    value: ${{ steps.inference.outputs.response }}
+  response-file:
+    description: Absolute path to the generated response file.
+    value: ${{ steps.inference.outputs.response-file }}
+  reasoning:
+    description: Model reasoning returned by llama.cpp.
+    value: ${{ steps.inference.outputs.reasoning }}
+  timings:
+    description: JSON timing data returned by llama.cpp.
+    value: ${{ steps.inference.outputs.timings }}
+  model-path:
+    description: Absolute path to the local GGUF model.
+    value: ${{ steps.inference.outputs.model-path }}
+  cache-hit:
+    description: Whether the local model cache was restored.
+    value: ${{ steps.model-cache.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - name: Validate runner
+      shell: bash
+      run: '"$GITHUB_ACTION_PATH/scripts/validate-runner.sh"'
+
+    - name: Restore model cache
+      id: model-cache
+      if: inputs.cache == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/ternary-bonsai-27b
+        key: ternary-bonsai-27b-q2-ubuntu-${{ runner.arch }}-abbae723-b9596
+
+    - name: Download model and runtime
+      shell: bash
+      env:
+        BONSAI_ROOT: ${{ runner.temp }}/ternary-bonsai-27b
+        HF_TOKEN: ${{ inputs.hf-token }}
+      run: '"$GITHUB_ACTION_PATH/scripts/download.sh"'
+
+    - name: Run local inference
+      id: inference
+      shell: bash
+      env:
+        BONSAI_ROOT: ${{ runner.temp }}/ternary-bonsai-27b
+        BONSAI_PROMPT: ${{ inputs.prompt }}
+        BONSAI_PROMPT_FILE: ${{ inputs.prompt-file }}
+        BONSAI_SYSTEM_PROMPT: ${{ inputs.system-prompt }}
+        BONSAI_CONTEXT_SIZE: ${{ inputs.context-size }}
+        BONSAI_MAX_TOKENS: ${{ inputs.max-tokens }}
+        BONSAI_TEMPERATURE: ${{ inputs.temperature }}
+        BONSAI_TOP_P: ${{ inputs.top-p }}
+        BONSAI_RESPONSE_FILE: ${{ inputs.response-file }}
+      run: '"$GITHUB_ACTION_PATH/scripts/run.sh"'
